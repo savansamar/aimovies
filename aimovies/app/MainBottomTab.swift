@@ -6,24 +6,43 @@
 //
 
 import UIKit
+protocol TabRefreshable {
+    func didBecomeVisible()
+}
 
-class MainBottomTab: UITabBarController {
+class MainBottomTab: UITabBarController , UITabBarControllerDelegate{
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
-
-        // Do any additional setup after loading the view.
-    }
     
+    
+    override func viewDidLoad() {
+          super.viewDidLoad()
+        self.delegate = self  // ✅ This line makes your class listen to tab switch events
 
-    /*
-    // MARK: - Navigation
+          let userVC = UINavigationController(rootViewController: Movies())
+          userVC.tabBarItem = UITabBarItem(title: "User", image: UIImage(systemName: "person.fill"), tag: 0)
 
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        // Get the new view controller using segue.destination.
-        // Pass the selected object to the new view controller.
-    }
-    */
+          let searchVC = UINavigationController(rootViewController: Search())
+          searchVC.tabBarItem = UITabBarItem(title: "Search", image: UIImage(systemName: "magnifyingglass"), tag: 1)
+
+          let profileVC = UINavigationController(rootViewController: Profile())
+          profileVC.tabBarItem = UITabBarItem(title: "Profile", image: UIImage(systemName: "person.circle"), tag: 2)
+
+          viewControllers = [userVC, searchVC, profileVC]
+          selectedIndex = 0
+
+          // Set the tab bar background color
+          tabBar.barTintColor = UIColor.white  // or any other color
+          tabBar.backgroundColor = UIColor.white
+          tabBar.tintColor = UIColor.blue     // selected icon color
+          tabBar.unselectedItemTintColor = UIColor.gray // unselected icon color
+        }
+
+    func tabBarController(_ tabBarController: UITabBarController, didSelect viewController: UIViewController) {
+          
+           if let nav = viewController as? UINavigationController,
+              let topVC = nav.topViewController as? TabRefreshable {
+               topVC.didBecomeVisible()
+           }
+       }
 
 }

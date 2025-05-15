@@ -11,7 +11,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		FBC7A9002DC8800B006ED653 /* Exceptions for "aimovies" folder in "aimovies" target */ = {
+		FB15CFB62DC8951A00A90E9E /* Exceptions for "aimovies" folder in "aimovies" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -24,7 +24,7 @@
 		FBC7A8F02DC88009006ED653 /* aimovies */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				FBC7A9002DC8800B006ED653 /* Exceptions for "aimovies" folder in "aimovies" target */,
+				FB15CFB62DC8951A00A90E9E /* Exceptions for "aimovies" folder in "aimovies" target */,
 			);
 			path = aimovies;
 			sourceTree = "<group>";
@@ -145,6 +145,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = CRTHLKVC56;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = aimovies/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -172,6 +173,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = CRTHLKVC56;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = aimovies/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
