@@ -28,6 +28,7 @@ class Movies: UIViewController {
     private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
+        layout.estimatedItemSize = .zero
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
         cv.translatesAutoresizingMaskIntoConstraints = false
         cv.backgroundColor = .white
@@ -142,27 +143,42 @@ extension Movies : UICollectionViewDataSource  {
 
 }
 
-
-extension Movies : UICollectionViewDelegateFlowLayout {
+extension Movies: UICollectionViewDelegateFlowLayout {
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
         return UIEdgeInsets(top: 0, left: 10, bottom: 20, right: 10)
     }
     
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        let size = ((self.view.frame.width - 20)  - 10 * 2 ) / 3
-        return CGSize(width: size, height: 120)
+    func collectionView(_ collectionView: UICollectionView,
+                        layout collectionViewLayout: UICollectionViewLayout,
+                        sizeForItemAt indexPath: IndexPath) -> CGSize {
         
+        let spacing: CGFloat = 10
+          let sectionInsets: CGFloat = 20 // 10 left + 10 right
+          let availableWidth = view.safeAreaLayoutGuide.layoutFrame.width - sectionInsets
+
+          let minItemsPerRow: CGFloat = 3
+          let desiredMinItemWidth: CGFloat = 100
+
+          // Dynamically calculate how many items can fit (min 3)
+          let maxItemsPerRow = floor((availableWidth + spacing) / (desiredMinItemWidth + spacing))
+          let itemsPerRow = max(minItemsPerRow, maxItemsPerRow)
+
+          let totalSpacing = (itemsPerRow - 1) * spacing
+          let itemWidth = floor((availableWidth - totalSpacing) / itemsPerRow)
+          let itemHeight = itemWidth * 1.5
+
+          return CGSize(width: itemWidth, height: itemHeight)
     }
-    
+
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat {
         return 10
     }
+
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
         return 10
     }
 }
-
 
 extension Movies : MovieCellDelegate , IconHeaderViewDelegate {
     func onTapImage(onCell cell: MovieCell) {
