@@ -184,15 +184,15 @@ extension Movies : MovieCellDelegate , IconHeaderViewDelegate {
     func onTapImage(onCell cell: MovieCell) {
 
            if let indexPath = collectionView.indexPath(for: cell) {
-               let selectedMovie = movies[indexPath.item]  // Assuming `movies` is your data source
+               let selectedMovie = movies[indexPath.item]
                MovieManager.shared.addMovie(selectedMovie)
                goToMovieDetails(with: selectedMovie)
                
            } else {
-
-               print("Cell not found in the collection view.")
+                print("Cell not found in the collection view.")
            }
     }
+    
     func iconHeaderViewDidTapIcon() {
         showErrorAlert(message: "tab")
     }

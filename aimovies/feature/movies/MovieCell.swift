@@ -15,11 +15,11 @@ class MovieCell: UICollectionViewCell {
     var imageUrl: String? = nil {
         didSet {
             guard let _ = imageUrl else {
-                print("Image URL is nil, stop loader if needed")
+                
                 activityIndicator.stopAnimating()
                 return
             }
-            print("Image successfully loaded")
+           
             activityIndicator.stopAnimating()
         }
     }
@@ -90,7 +90,7 @@ class MovieCell: UICollectionViewCell {
             // Asynchronously download the image
             URLSession.shared.dataTask(with: url) { data, _, error in
                 if let error = error {
-                    print("❌ Error loading image:", error)
+                   
                     return
                 }
                 
