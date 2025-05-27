@@ -1,6 +1,7 @@
 import UIKit
 
 class Search: UIViewController {
+    
 
     var movieCategories:[Genre] = []
     var store_title : String = ""
@@ -39,11 +40,16 @@ class Search: UIViewController {
         let search = UISearchBar()
         search.placeholder = "Search"
         search.translatesAutoresizingMaskIntoConstraints = false
-
+        search.searchBarStyle = .minimal // cleaner appearance
+        search.barTintColor = .white
+        search.backgroundColor = .white
+        search.setBackgroundImage(UIImage(), for: .any, barMetrics: .default) // remove shadow line
+        
         if let textField = search.value(forKey: "searchField") as? UITextField {
-            textField.backgroundColor = .systemGray3
+            textField.backgroundColor = .white
             textField.textColor = .black
             textField.layer.cornerRadius = 10
+            textField.layer.masksToBounds = true
         }
 
         return search
@@ -191,7 +197,39 @@ class Search: UIViewController {
         stack.addArrangedSubview(collectionOfMoviesCategories)
         return stack
     }()
+ 
     
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .white
+        
+        Task{
+            await getMovieCategories()
+        }
+
+        addCategoryInfo(title: "Popular movies", subtitle: "The hottest movies on the internet")
+        addCategoryInfo(title: "Top rated movies", subtitle: "The top rated movies on the internet")
+        
+        view.addSubview(loaderOverlay)
+        view.addSubview(header)
+        view.addSubview(searchBar)
+        view.addSubview(scrollView)
+        scrollView.addSubview(contentView)
+        contentView.addSubview(parentStack)
+
+        parentStack.backgroundColor = .white
+        recentMovies.backgroundColor = .white
+
+        horizonatlCollectionView.heightAnchor.constraint(equalToConstant: 180).isActive = true
+        collectionOfMoviesCategories.heightAnchor.constraint(equalToConstant: 400).isActive = true
+      
+        setupConstraints()
+        removeKeyboardByTapGesture()
+       
+    }
+    
+    
+      
     private func addCategoryInfo(title: String, subtitle: String) {
         store_title = title
         let titleLabel = UILabel()
@@ -229,130 +267,6 @@ class Search: UIViewController {
         categoryInfoStack.addArrangedSubview(separator)
     }
     
- 
-    func getPopularMovies(type:String) async -> [PopularMovie]? {
-        guard !isLoadingMore else { return nil }
-        isLoadingMore = true
-        currentPage += 1
-
-        do {
-            if type == "Popular movies"{
-                let popular = try await MovieAPI.shared.fetchPopularMovies(page: currentPage)
-                isLoadingMore = false
-                return popular // Return the fetched movies
-            }else{
-                let popular = try await MovieAPI.shared.fetchTopRatedMovies(page: currentPage)
-                isLoadingMore = false
-                return popular // Return the fetched movies
-            }
-           
-            
-        } catch {
-            print("Error: \(error)")
-            isLoadingMore = false
-            return nil // Return nil if there is an error
-        }
-    }
-    
-    
-    func getMovies(_ type:String?) {
-        showLoader()
-        currentPage = 0
-        
-        if type == "Popular movies" {
-            Task { [weak self] in
-                guard let self = self else { return }
-                
-                if let response = await getPopularMovies(type: type ?? "") {
-                    hideLoader()
-                    root.movies.append(contentsOf: response)
-                    root.header_title = "Popular movies"
-                    root.delegate = self
-                    root.reloadTable()
-                    root.modalPresentationStyle = .fullScreen
-                    present(root, animated: true)
-                   
-                } else {
-                    
-                    hideLoader()
-                    print("Failed to fetch popular movies.")
-                }
- 
-            }
-        } else {
-            Task {
-                if let response = await getPopularMovies(type: type ?? "") {
-                    hideLoader()
-                    root.movies.append(contentsOf: response)
-                    root.header_title = "Top rated movies"
-                    root.delegate = self
-                    root.reloadTable()
-                    root.modalPresentationStyle = .fullScreen
-                    present(root, animated: true)
-                   
-                } else {
-                    hideLoader()
-                    
-                    print("Failed to fetch popular movies.")
-                }
-            }
-        }
-       
-    }
-    
-    @objc private func handleTitleTap(_ sender: UITapGestureRecognizer) {
-        if let label = sender.view as? UILabel {
-            root.tableView.setContentOffset(.zero, animated: true)
-            root.movies = []
-            root.reloadTable()
-            root.header_title = ""
-            getMovies(label.text)
-        }
-    }
-    
-  
-    private func getMovieCategories() async {
-     
-        do {
-            let movies = try await MovieAPI.shared.fetchMovieeCategories()
-            DispatchQueue.main.async {
-                
-                self.movieCategories = movies
-                self.collectionOfMoviesCategories.reloadData()
-            }
-        } catch {
-           print("while fetch movie categories : ")
-        }
-    }
-    
-    // MARK: - Lifecycle
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = .systemGray3
-        
-        Task{
-            await getMovieCategories()
-        }
-
-        addCategoryInfo(title: "Popular movies", subtitle: "The hottest movies on the internet")
-        addCategoryInfo(title: "Top rated movies", subtitle: "The top rated movies on the internet")
-        
-        view.addSubview(loaderOverlay)
-        view.addSubview(header)
-        view.addSubview(searchBar)
-        view.addSubview(scrollView)
-        scrollView.addSubview(contentView)
-        contentView.addSubview(parentStack)
-
-        parentStack.backgroundColor = .white
-        recentMovies.backgroundColor = .white
-
-        horizonatlCollectionView.heightAnchor.constraint(equalToConstant: 180).isActive = true
-        collectionOfMoviesCategories.heightAnchor.constraint(equalToConstant: 400).isActive = true
-      
-        setupConstraints()
-    }
 
     func showLoader() {
         view.bringSubviewToFront(loaderOverlay)
@@ -409,8 +323,6 @@ extension Search: UICollectionViewDataSource, UICollectionViewDelegate {
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-       
-
         if collectionView == horizonatlCollectionView {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: MovieCell.reuseIdentifier, for: indexPath) as! MovieCell
             let response = MovieManager.shared.getReversedMovies()
@@ -423,9 +335,17 @@ extension Search: UICollectionViewDataSource, UICollectionViewDelegate {
             cell.configureCell(with: categories)
             return cell
         }
-
-        
     }
+    
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        print(movieCategories[indexPath.row])
+        root.tableView.setContentOffset(.zero, animated: true)
+        root.movies = []
+        root.reloadTable()
+        root.header_title = ""
+        getMovies("\(movieCategories[indexPath.row].id)")
+    }
+    
 }
 
 // MARK: - Tab Refreshable
@@ -439,4 +359,142 @@ extension Search: TabRefreshable , PopularMoviesDelgates {
        
         getMovies(title)
     }
+}
+
+
+
+extension Search {
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
+    }
+    
+    private func removeKeyboardByTapGesture() {
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        tapGesture.cancelsTouchesInView = false
+        view.addGestureRecognizer(tapGesture)
+    }
+    
+    
+    func getPopularMovies(type:String) async -> [PopularMovie]? {
+        guard !isLoadingMore else { return nil }
+        isLoadingMore = true
+        currentPage += 1
+
+        do {
+            if type == "Popular movies"{
+                let popular = try await MovieAPI.shared.fetchPopularMovies(page: currentPage)
+                isLoadingMore = false
+                return popular // Return the fetched movies
+            }
+            else if type == "Top rated movies" {
+                let popular = try await MovieAPI.shared.fetchTopRatedMovies(page: currentPage)
+                isLoadingMore = false
+                return popular // Return the fetched movies
+            }else{
+                guard let value = Int(type) else {
+                    return nil
+                }
+
+                let popular = try await MovieAPI.shared.fetchMoviesByGenre(genreID: value, page: currentPage)
+                isLoadingMore = false
+                return popular
+            }
+           
+            
+        } catch {
+            print("Error: \(error)")
+            isLoadingMore = false
+            return nil // Return nil if there is an error
+        }
+    }
+    
+    
+    func getMovies(_ type:String?) {
+        showLoader()
+        currentPage = 0
+        
+        if type == "Popular movies" {
+            Task { [weak self] in
+                guard let self = self else { return }
+                
+                if let response = await getPopularMovies(type: type ?? "") {
+                    hideLoader()
+                    root.movies.append(contentsOf: response)
+                    root.header_title = "Popular movies"
+                    root.delegate = self
+                    root.reloadTable()
+                    root.modalPresentationStyle = .fullScreen
+                    present(root, animated: true)
+                   
+                } else {
+                    hideLoader()
+                    print("Failed to fetch popular movies.")
+                }
+ 
+            }
+        }
+        
+        else if type == "Top rated movies" {
+            Task {
+                if let response = await getPopularMovies(type: type ?? "") {
+                    hideLoader()
+                    root.movies.append(contentsOf: response)
+                    root.header_title = "Top rated movies"
+                    root.delegate = self
+                    root.reloadTable()
+                    root.modalPresentationStyle = .fullScreen
+                    present(root, animated: true)
+                   
+                } else {
+                    hideLoader()
+                    print("Failed to fetch popular movies.")
+                }
+            }
+        }
+        else{
+            Task {
+                if let response = await getPopularMovies(type: type ?? "") {
+                    hideLoader()
+                    root.movies.append(contentsOf: response)
+                    root.header_title = "Movies"
+                    root.delegate = self
+                    root.reloadTable()
+                    root.modalPresentationStyle = .fullScreen
+                    present(root, animated: true)
+                   
+                } else {
+                    hideLoader()
+                    
+                    print("Failed to fetch popular movies.")
+                }
+            }
+        }
+       
+    }
+    
+    @objc private func handleTitleTap(_ sender: UITapGestureRecognizer) {
+        if let label = sender.view as? UILabel {
+            root.tableView.setContentOffset(.zero, animated: true)
+            root.movies = []
+            root.reloadTable()
+            root.header_title = ""
+            getMovies(label.text)
+        }
+    }
+    
+  
+    private func getMovieCategories() async {
+     
+        do {
+            let movies = try await MovieAPI.shared.fetchMovieeCategories()
+            DispatchQueue.main.async {
+                
+                self.movieCategories = movies
+                self.collectionOfMoviesCategories.reloadData()
+            }
+        } catch {
+           print("while fetch movie categories : ")
+        }
+    }
+    
 }

@@ -86,13 +86,16 @@ struct TrailerResponse: Decodable {
 
 class MovieAPI {
     static let shared = MovieAPI()
-    private let apiKey = "0141e6d543b187f0b7e6bb3a1902209a"
-    private let baseURL = "https://api.themoviedb.org/3"
+    
+    
+    let apiKey = SecretsManager.shared.apiKey
+    let baseURL = SecretsManager.shared.baseURL
+  
     
     var genresMap: [Int: String] = [:]
 
-    func fetchUpcomingMovies() async throws -> [Movie] {
-        guard let url = URL(string: "\(baseURL)/movie/upcoming?api_key=\(apiKey)&language=en-US&page=1") else {
+    func fetchUpcomingMovies(page: Int) async throws -> [Movie] {
+        guard let url = URL(string: "\(baseURL)/movie/upcoming?api_key=\(apiKey)&language=en-US&page=\(page)") else {
             throw URLError(.badURL)
         }
 
@@ -100,6 +103,7 @@ class MovieAPI {
         let decoded = try JSONDecoder().decode(MovieResponse.self, from: data)
         return decoded.results
     }
+    
 
     func fetchMovieeCategories() async throws ->[Genre] {
         guard let url = URL(string: "\(baseURL)/genre/movie/list?api_key=\(apiKey)&language=en-US&page=1") else {
@@ -119,6 +123,8 @@ class MovieAPI {
     
     func fetchMovies(endpoint: String, page: Int = 1) async throws -> [PopularMovie] {
         // Construct the URL for the API endpoint (either popular or top-rated)
+        
+     
         guard let url = URL(string: "\(baseURL)/movie/\(endpoint)?api_key=\(apiKey)&language=en-US&page=\(page)") else {
             throw URLError(.badURL)
         }
@@ -182,7 +188,7 @@ class MovieAPI {
     
     
     func fetchMovieReviews(movieID: Int) async throws -> [Review] {
-           let urlString = "https://api.themoviedb.org/3/movie/\(movieID)/reviews?api_key=\(apiKey)"
+           let urlString = "\(baseURL)\(movieID)/reviews?api_key=\(apiKey)"
            guard let url = URL(string: urlString) else {
                throw URLError(.badURL)
            }
@@ -194,7 +200,7 @@ class MovieAPI {
     
     func fetchMovieTrailers(movieID: Int) async throws -> [Trailer] {
             
-            let urlString = "https://api.themoviedb.org/3/movie/\(movieID)/videos?api_key=\(apiKey)&language=en-US"
+            let urlString = "\(baseURL)\(movieID)/videos?api_key=\(apiKey)&language=en-US"
             guard let url = URL(string: urlString) else {
                 throw URLError(.badURL)
             }
@@ -203,5 +209,31 @@ class MovieAPI {
             let decoded = try JSONDecoder().decode(TrailerResponse.self, from: data)
             return decoded.results.filter { $0.name.lowercased().contains("trailer") || $0.name.lowercased().contains("video") }
         }
+    
+    
+    func fetchMoviesByGenre(genreID: Int, page: Int = 1) async throws -> [PopularMovie] {
+        guard let url = URL(string: "\(baseURL)/discover/movie?api_key=\(apiKey)&language=en-US&page=\(page)&with_genres=\(genreID)") else {
+            throw URLError(.badURL)
+        }
+
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let decoded = try JSONDecoder().decode(MovieResponse.self, from: data)
+
+        var movies: [PopularMovie] = []
+
+        for movie in decoded.results {
+            let genreNames = genreNames(for: movie.genreIDs)
+            let popularMovie = PopularMovie(
+                title: movie.title,
+                genre: genreNames.joined(separator: ", "),
+                releaseDate: movie.releaseDate,
+                rating: movie.voteAverage,
+                posterImage: movie.posterPath
+            )
+            movies.append(popularMovie)
+        }
+
+        return movies
+    }
     
 }

@@ -83,6 +83,7 @@ class MovieCategoryCell: UICollectionViewCell {
     func setConstraints(){
        
         label1.textAlignment = .center
+        label1.textColor = .black
         firstStack.addArrangedSubview(label1)
         secondStack.addArrangedSubview(dropButton)
         

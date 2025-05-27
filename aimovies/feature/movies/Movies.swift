@@ -9,22 +9,18 @@ import UIKit
 
 class Movies: UIViewController {
     
-    var movies: [Movie] = []
-    
+    // MARK: - Properties
+    private var movies: [Movie] = []
+    private var currentPage = 1
+    private var isPaginating = false
     private var isLoading = false {
         didSet {
-            // Update UI visibility based on loading state
             collectionView.isHidden = isLoading
-            if isLoading {
-//                showErrorAlert(message: "\(isLoading)")
-                activityIndicator.startAnimating()
-            } else {
-//                showErrorAlert(message: "\(isLoading)")
-                activityIndicator.stopAnimating()
-            }
+            isLoading ? activityIndicator.startAnimating() : activityIndicator.stopAnimating()
         }
     }
     
+    // MARK: - UI Components
     private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
@@ -33,6 +29,11 @@ class Movies: UIViewController {
         cv.translatesAutoresizingMaskIntoConstraints = false
         cv.backgroundColor = .white
         cv.register(MovieCell.self, forCellWithReuseIdentifier: MovieCell.reuseIdentifier)
+        cv.register(UICollectionReusableView.self,
+                    forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter,
+                    withReuseIdentifier: "footer")
+        cv.dataSource = self
+        cv.delegate = self
         return cv
     }()
     
@@ -42,63 +43,30 @@ class Movies: UIViewController {
         spinner.hidesWhenStopped = true
         return spinner
     }()
+    
+    private let header: Header = {
+        let header = Header()
+        header.translatesAutoresizingMaskIntoConstraints = false
+        return header
+    }()
 
+    // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .white
+        setupLayout()
+        setupHeader()
         
         Task {
-            await loadUpcomingMovies()  // Calling the async method from a Task
-        }
-        
-        setUp()
-    }
-    
-    
-    private func loadUpcomingMovies() async {
-        
-        DispatchQueue.main.async {
-                self.isLoading = true
-        }
-        
-        do {
-            let movies = try await MovieAPI.shared.fetchUpcomingMovies()
-            DispatchQueue.main.async {
-                self.movies = movies
-                self.isLoading = false
-                self.collectionView.reloadData()
-            }
-        } catch let _ {
-            DispatchQueue.main.async {
-                self.showErrorAlert(message: "Failed to load movies. Please check your internet connection and try again.")
-                self.isLoading = false
-                
-            }
+            await loadUpcomingMovies()
         }
     }
-    
-    private func showErrorAlert(message: String) {
-        let alert = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        present(alert, animated: true)
-    }
- 
-    
-    func setUp() {
-        let header = Header()
-        header.delegate = self
-        header.title = "Upcoming movies"
-        header.icon = UIImage(systemName: "person.circle")
-        header.rightIcon = UIImage(systemName: "person.circle")
-       
-        collectionView.dataSource = self
-        collectionView.delegate = self
-        
+
+    // MARK: - Setup
+    private func setupLayout() {
         view.addSubview(header)
         view.addSubview(collectionView)
         view.addSubview(activityIndicator)
-       
-        header.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
             header.topAnchor.constraint(equalTo: view.topAnchor),
@@ -106,97 +74,196 @@ class Movies: UIViewController {
             header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             header.heightAnchor.constraint(equalToConstant: 120),
             
-            collectionView.topAnchor.constraint(equalTo: header.bottomAnchor,constant: 30),
+            collectionView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 30),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
             activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
     }
     
-    func goToMovieDetails(with movie: Movie) {
-        DispatchQueue.main.async {
-            let root = MovieDetails()
-            root.movie = movie
-            root.modalPresentationStyle = .fullScreen // optional
-            self.present(root, animated: true, completion: nil)
-        }
-        
+    private func setupHeader() {
+        header.delegate = self
+        header.title = "Upcoming movies"
+        header.icon = UIImage(systemName: "person.circle")
+        header.rightIcon = UIImage(systemName: "person.circle")
     }
     
+    // MARK: - API
+    private func loadUpcomingMovies() async {
+        guard !isPaginating else { return }
+        isPaginating = true
+
+        if currentPage == 1 {
+            DispatchQueue.main.async {
+                self.isLoading = true
+            }
+        }
+
+        do {
+            let newMovies = try await MovieAPI.shared.fetchUpcomingMovies(page: currentPage)
+            DispatchQueue.main.async {
+                if self.currentPage == 1 {
+                    self.movies = newMovies
+                    self.collectionView.reloadData()
+                } else {
+                    let startIndex = self.movies.count
+                    let endIndex = startIndex + newMovies.count
+                    let indexPaths = (startIndex..<endIndex).map { IndexPath(item: $0, section: 0) }
+
+                    self.movies.append(contentsOf: newMovies)
+                    self.collectionView.performBatchUpdates {
+                        self.collectionView.insertItems(at: indexPaths)
+                    }
+                }
+
+                self.isLoading = false
+
+                // Slight delay to allow footer loader to show smoothly
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    self.isPaginating = false
+                    // Reload footer size if needed
+                    self.collectionView.collectionViewLayout.invalidateLayout()
+                }
+            }
+        } catch {
+            DispatchQueue.main.async {
+                self.showErrorAlert(message: "Failed to load movies. Please check your internet connection and try again.")
+                self.isLoading = false
+                self.isPaginating = false
+            }
+        }
+    }
+
+    // MARK: - Navigation
+    func goToMovieDetails(with movie: Movie) {
+        let root = MovieDetails()
+        root.movie = movie
+        root.modalPresentationStyle = .fullScreen
+        present(root, animated: true)
+    }
+
+    // MARK: - Error
+    private func showErrorAlert(message: String) {
+        let alert = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
 }
 
-extension Movies : UICollectionViewDataSource  {
+// MARK: - UICollectionViewDataSource
+extension Movies: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return movies.count // Just for testing
-       }
+        return movies.count
+    }
 
-       func collectionView(_ collectionView: UICollectionView,cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+    func collectionView(_ collectionView: UICollectionView,
+                        cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let movie = movies[indexPath.row]
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: MovieCell.reuseIdentifier, for: indexPath) as! MovieCell
+        cell.configureCell(with: movie)
+        cell.delegate = self
+        return cell
+    }
 
-            let  movie = movies[indexPath.row]
-            let  cell = collectionView.dequeueReusableCell(withReuseIdentifier: MovieCell.reuseIdentifier, for: indexPath) as! MovieCell
-                 cell.configureCell(with: movie)
-                 cell.delegate = self
-          return cell
-       }
+    func collectionView(_ collectionView: UICollectionView,
+                        viewForSupplementaryElementOfKind kind: String,
+                        at indexPath: IndexPath) -> UICollectionReusableView {
+        if kind == UICollectionView.elementKindSectionFooter {
+            let footer = collectionView.dequeueReusableSupplementaryView(ofKind: kind,
+                                                                         withReuseIdentifier: "footer",
+                                                                         for: indexPath)
+            footer.subviews.forEach { $0.removeFromSuperview() }
 
+            if isPaginating {
+                let spinner = UIActivityIndicatorView(style: .medium)
+                spinner.translatesAutoresizingMaskIntoConstraints = false
+                spinner.startAnimating()
+                footer.addSubview(spinner)
+
+                NSLayoutConstraint.activate([
+                    spinner.centerXAnchor.constraint(equalTo: footer.centerXAnchor),
+                    spinner.centerYAnchor.constraint(equalTo: footer.centerYAnchor)
+                ])
+            }
+
+            return footer
+        }
+        return UICollectionReusableView()
+    }
 }
 
+// MARK: - UICollectionViewDelegateFlowLayout
 extension Movies: UICollectionViewDelegateFlowLayout {
     
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
+    
+    func collectionView(_ collectionView: UICollectionView,
+                        layout collectionViewLayout: UICollectionViewLayout,
+                        insetForSectionAt section: Int) -> UIEdgeInsets {
         return UIEdgeInsets(top: 0, left: 10, bottom: 20, right: 10)
     }
+
     
     func collectionView(_ collectionView: UICollectionView,
                         layout collectionViewLayout: UICollectionViewLayout,
                         sizeForItemAt indexPath: IndexPath) -> CGSize {
-        
         let spacing: CGFloat = 10
-          let sectionInsets: CGFloat = 20 // 10 left + 10 right
-          let availableWidth = view.safeAreaLayoutGuide.layoutFrame.width - sectionInsets
-
-          let minItemsPerRow: CGFloat = 3
-          let desiredMinItemWidth: CGFloat = 100
-
-          // Dynamically calculate how many items can fit (min 3)
-          let maxItemsPerRow = floor((availableWidth + spacing) / (desiredMinItemWidth + spacing))
-          let itemsPerRow = max(minItemsPerRow, maxItemsPerRow)
-
-          let totalSpacing = (itemsPerRow - 1) * spacing
-          let itemWidth = floor((availableWidth - totalSpacing) / itemsPerRow)
-          let itemHeight = itemWidth * 1.5
-
-          return CGSize(width: itemWidth, height: itemHeight)
+        let sectionInsets: CGFloat = 20
+        let availableWidth = view.safeAreaLayoutGuide.layoutFrame.width - sectionInsets
+        let minItemsPerRow: CGFloat = 3
+        let desiredMinItemWidth: CGFloat = 100
+        let maxItemsPerRow = floor((availableWidth + spacing) / (desiredMinItemWidth + spacing))
+        let itemsPerRow = max(minItemsPerRow, maxItemsPerRow)
+        let totalSpacing = (itemsPerRow - 1) * spacing
+        let itemWidth = floor((availableWidth - totalSpacing) / itemsPerRow)
+        let itemHeight = itemWidth * 1.5
+        return CGSize(width: itemWidth, height: itemHeight)
     }
 
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat {
+    func collectionView(_ collectionView: UICollectionView,
+                        layout collectionViewLayout: UICollectionViewLayout,
+                        minimumLineSpacingForSectionAt section: Int) -> CGFloat {
         return 10
     }
 
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
+    func collectionView(_ collectionView: UICollectionView,
+                        layout collectionViewLayout: UICollectionViewLayout,
+                        minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
         return 10
+    }
+
+    func collectionView(_ collectionView: UICollectionView,
+                        layout collectionViewLayout: UICollectionViewLayout,
+                        referenceSizeForFooterInSection section: Int) -> CGSize {
+        return isPaginating ? CGSize(width: collectionView.frame.width, height: 50) : .zero
+    }
+
+    
+    func collectionView(_ collectionView: UICollectionView,
+                        willDisplay cell: UICollectionViewCell,
+                        forItemAt indexPath: IndexPath) {
+        if indexPath.row == movies.count - 1 && !isPaginating {
+            currentPage += 1
+            Task {
+                await loadUpcomingMovies()
+            }
+        }
     }
 }
 
-extension Movies : MovieCellDelegate , IconHeaderViewDelegate {
+// MARK: - MovieCellDelegate & Header Delegate
+extension Movies: MovieCellDelegate, IconHeaderViewDelegate {
     func onTapImage(onCell cell: MovieCell) {
-
-           if let indexPath = collectionView.indexPath(for: cell) {
-               let selectedMovie = movies[indexPath.item]
-               MovieManager.shared.addMovie(selectedMovie)
-               goToMovieDetails(with: selectedMovie)
-               
-           } else {
-                print("Cell not found in the collection view.")
-           }
+        if let indexPath = collectionView.indexPath(for: cell) {
+            let selectedMovie = movies[indexPath.item]
+            MovieManager.shared.addMovie(selectedMovie)
+            goToMovieDetails(with: selectedMovie)
+        }
     }
-    
+
     func iconHeaderViewDidTapIcon() {
-        showErrorAlert(message: "tab")
+        showErrorAlert(message: "Header icon tapped.")
     }
-    
 }
-
-
